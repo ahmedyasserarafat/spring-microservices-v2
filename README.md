@@ -2,7 +2,6 @@
 
 #### V2 of our most popular course - Microservices + Spring Cloud + Docker + Kubernetes
 
-[![Image](https://www.springboottutorial.com/images/Course-Master-Microservices-with-Spring-Boot-and-Spring-Cloud.png "Master Microservices with Spring Boot and Spring Cloud")](https://www.udemy.com/course/microservices-with-spring-boot-and-spring-cloud/)
 
 Learn how to create awesome Microservices and RESTful web services with Spring and Spring Boot.
 
