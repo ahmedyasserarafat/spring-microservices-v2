@@ -100,6 +100,9 @@ Final
 ### Spring Cloud Config Server - Steps 01 to 08
 ---
 
+(0) Do you get this error 'org.springframework.cloud.config.server.environment.NoSuchLabelException: No such label: master`?  Add this in application.properties: 'spring.cloud.config.server.git.default-label=main`
+
+
 (1) Does the URL http://localhost:8888/limits-service/default work? If the URL does not work, check if you have the same name for limits-service in (a) spring.application.name in bootstrap.properties (b) in the URL (c) in the name of the property file
 
 (2) Check if the name in @ConfigurationProperties("limits-service") matches the prefix of property values in application.properties. limits-service.minimum=9 limits-service.maximum=999
@@ -714,6 +717,13 @@ public class CurrencyExchange {
 
 Step 13 - Configure JPA and Initialized Data
 
+- If you are Spring Boot >=2.5.0, You would need to configure this in application.properties `spring.jpa.defer-datasource-initialization=true` 
+	- OR use schema.sql instead of data.sql
+	- More details - https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-2.5.0-M3-Release-Notes#hibernate-and-datasql
+- Complete debugging guide for problems with JPA and Hibernate: https://github.com/in28minutes/in28minutes-initiatives/blob/master/The-in28Minutes-TroubleshootingGuide-And-FAQ/jpa-and-hibernate.md#tables-are-not-created
+
+
+
 #### /currency-exchange-service/pom.xml Modified
 New Lines
 ```xml
@@ -761,7 +771,7 @@ spring.h2.console.enabled=true
 
 spring.application.name=currency-exchange
 server.port=8000
-
+spring.jpa.defer-datasource-initialization=true # For >2.5.0
 ```
 
 #### /currency-exchange-service/src/main/resources/data.sql New
@@ -1075,8 +1085,6 @@ public class CurrencyConversionController {
 ### Debugging problems with Feign
 ---
 
-A number of stuedent
-
 (1) Ensure that you have the annotation @EnableFeignClients with right packages on the class public class CurrencyConversionServiceApplication @EnableFeignClients("com.in28minutes.microservices.currencyconversionservice")
 
 (2) Ensure you have path variables defined for from and to with the key from and to as shown in CurrencyExchangeServiceProxy - @PathVariable("from") String from, @PathVariable("to") String to
@@ -1351,19 +1359,7 @@ public interface CurrencyExchangeProxy {
 ### Spring Cloud API Gateway - Step 22 to Step 25
 ---
 
-(-2) Give these settings a try individually in application.properties of all microservices (currency-exchange, currency-conversion, api-gateway) to see if they help
-
-```
-eureka.instance.prefer-ip-address=true
-```
-
-OR
-
-```
-eureka.instance.hostname=localhost
-```
-
-(0) Make sure you are using the right URLs?
+(1) Make sure you are using the right URLs?
 
 Discovery
 - http://localhost:8765/CURRENCY-EXCHANGE/currency-exchange/from/USD/to/INR
@@ -1381,8 +1377,27 @@ Discovery Disabled and Custom Routes Configured
 - http://localhost:8765/currency-conversion-feign/from/USD/to/INR/quantity/10
 - http://localhost:8765/currency-conversion-new/from/USD/to/INR/quantity/10
 
+(2) Enable wiretap to see more details
 
-(1) Are you using right configuration?
+```
+spring.cloud.gateway.httpserver.wiretap=true and spring.cloud.gateway.httpclient.wiretap=true
+```
+
+
+(3) Give these settings a try individually in application.properties of all microservices (currency-exchange, currency-conversion, api-gateway) to see if they help
+
+```
+eureka.instance.prefer-ip-address=true
+```
+
+OR
+
+```
+eureka.instance.hostname=localhost
+```
+
+
+(4) Are you using right configuration?
 
 ```
 spring.application.name=api-gateway
@@ -1394,19 +1409,19 @@ eureka.client.serviceUrl.defaultZone=http://localhost:8761/eureka
 #spring.cloud.gateway.discovery.locator.lowerCaseServiceId=true
 ```
 
-(2) Compare against the code for ApiGatewayConfiguration below?
+(5) Compare against the code for ApiGatewayConfiguration below?
 
-(3) Compare against the code for LoggingFilter below?
+(6) Compare against the code for LoggingFilter below?
 
-(4) Ensure that all the three services are registered with Eureka at http://localhost:8761/.
+(7) Ensure that all the three services are registered with Eureka at http://localhost:8761/.
 
-(5) Try if it works when you include the following property in application.properties for currency-conversion-service and currency-exchange-service
+(8) Try if it works when you include the following property in application.properties for currency-conversion-service and currency-exchange-service
 
 ```
 eureka.instance.hostname=localhost
 ```
 
-(6) Some student reported success when using lower-case-service-id instead of spring.cloud.gateway.discovery.locator.lowerCaseServiceId. See if it helps!
+(9) Some student reported success when using lower-case-service-id instead of spring.cloud.gateway.discovery.locator.lowerCaseServiceId. See if it helps!
 
 ```
 spring.cloud.gateway.discovery.locator.enabled=true
@@ -1418,7 +1433,7 @@ spring.cloud.gateway.discovery.locator.lower-case-service-id=true
 
 ```
 
-(7) Compare code against the complete list of components below.
+(10) Compare code against the complete list of components below.
 
 
 If everything is fine
@@ -1613,6 +1628,27 @@ public class LoggingFilter implements GlobalFilter {
 ### Circuit Breaker - 26 to 29
 ---
 
+(0) Can you use maxAttempts instead of maxRetryAttempts?
+```
+resilience4j.retry.instances.sample-api.maxAttempts=5 #NEW
+#resilience4j.retry.instances.sample-api.maxRetryAttempts=5 #OLD
+```
+
+(1) There is not equivalent watch command in Windows. All we can do is to run the following command on Window's command prompt:
+
+```
+for /l %g in () do @(curl http://localhost:8000/sample-api & timeout /t 5)
+```
+
+The output will be:
+```
+fallback-response
+
+wait for 5/4/3/2/1 seconds, press a key to continue....
+```
+
+Reference: https://www.shellhacks.com/windows-watch-command-equivalent-cmd-powershell/
+
 ---
 ### Step 26 to 29
 ---
@@ -1682,7 +1718,9 @@ public class CircuitBreakerController {
 #### /currency-exchange-service/src/main/resources/application.properties Modified
 New Lines
 ```properties
-resilience4j.retry.instances.sample-api.maxRetryAttempts=5
+resilience4j.retry.instances.sample-api.maxAttempts=5 #NEW
+#resilience4j.retry.instances.sample-api.maxRetryAttempts=5 #OLD
+
 resilience4j.retry.instances.sample-api.waitDuration=1s
 resilience4j.retry.instances.sample-api.enableExponentialBackoff=true
 #resilience4j.circuitbreaker.instances.default.failureRateThreshold=90
@@ -1694,6 +1732,41 @@ resilience4j.bulkhead.instances.sample-api.maxConcurrentCalls=10
 
 
 ## Docker Section - Connect Microservices with Zipkin
+
+(1) Compare and try with the Docker Compose Backup files here:
+- (5 Docker Compose Backup Files)[https://github.com/in28minutes/spring-microservices-v2/tree/main/04.docker/backup]
+
+(2) Try with 3.8.12-management for rabbitmq
+
+```
+rabbitmq:
+    image: rabbitmq:3.8.12-management
+```
+
+(3) Try adding `restart: always` to zipkin-server in docker-compose.yaml
+
+```
+  zipkin-server:
+    image: openzipkin/zipkin:2.23
+    mem_limit: 300m
+    ports:
+      - "9411:9411"
+    networks:
+      - currency-network
+    environment:
+      RABBIT_URI: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      - rabbitmq
+    restart: always #Restart if there is a problem starting up
+```
+
+(4) Can you try adding EUREKA.CLIENT.FETCHREGISTRY property to all microservice where we configured EUREKA.CLIENT.SERVICEURL.DEFAULTZONE as shown below:
+
+```
+environment:
+  EUREKA.CLIENT.SERVICEURL.DEFAULTZONE: http://naming-server:8761/eureka
+  EUREKA.CLIENT.FETCHREGISTRY: "true"
+```
 
 ### Docker Step 12
 
